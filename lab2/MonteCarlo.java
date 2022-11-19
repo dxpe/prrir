@@ -10,19 +10,21 @@ public class MonteCarlo extends Thread {
     Random rand = new Random();
     int total, in_circle;
     Helper h;
-    MonteCarlo(int radius, Helper h, int id) {
+    int sample_size;
+    MonteCarlo(int radius, Helper h, int id, int sample_size) {
         this.radius = radius;
         area_square = radius * 2 * radius * 2;
         this.total = 0;
         this.in_circle = 0;
         this.h = h;
         this.id = id;
+        this.sample_size = sample_size;
     }
     static boolean isPointInCircle(double x, double y, int radius) {
         return Math.sqrt(Math.pow((x - radius), 2) + Math.pow((y - radius), 2)) <= radius;
     }
     public void run() {
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < sample_size; i++) {
             double x = rand.nextDouble(radius * 2);
             double y = rand.nextDouble(radius * 2);
             if (isPointInCircle(x, y, radius)) {
@@ -65,7 +67,7 @@ class Main {
         double expected = Math.pow(radius, 2) * Math.PI;
         List<Thread> threadList = new ArrayList<>();
         for (int i = 0; i < 100; i++) {
-            MonteCarlo m = new MonteCarlo(radius, h, i);
+            MonteCarlo m = new MonteCarlo(radius, h, i, 10000);
             m.start();
             threadList.add(m);
         }
