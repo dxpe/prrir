@@ -1,0 +1,133 @@
+import java.awt.Color;
+import java.awt.Graphics;
+import java.util.concurrent.Semaphore;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+public class FilozofowieVisual extends JPanel {
+
+    int liczba_filozofow;
+    Color[] kolory;
+
+    public FilozofowieVisual(int liczba_filozofow) {
+        this.liczba_filozofow = liczba_filozofow;
+        kolory = new Color[liczba_filozofow];
+        for (int i = 0; i < liczba_filozofow; i++) {
+            kolory[i] = Color.WHITE;
+        }
+    }
+
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        for (int i = 0; i < liczba_filozofow; i++) {
+            g.setColor(Color.BLACK);
+            g.drawOval(i * 100, 100, 50, 50);
+            g.setColor(kolory[i]);
+            g.fillOval(i * 100, 100, 50, 50);
+        }
+    }
+}
+
+class Filozofowie extends Thread {
+
+    int liczba_filozofow;
+    static Semaphore[] widelec;
+    int mojNum;
+    FilozofowieVisual panel;
+    int variant;
+    Semaphore semaphore;
+
+    public Filozofowie(int nr, FilozofowieVisual panel, int variant, int liczba_filozofow, Semaphore semaphore) {
+        mojNum = nr;
+        this.panel = panel;
+        this.variant = variant;
+        this.liczba_filozofow = liczba_filozofow;
+        this.semaphore = semaphore;
+    }
+    public void run() {
+        while (true) {
+            try {
+                semaphore.acquire();
+                panel.kolory[mojNum] = Color.YELLOW;
+                panel.repaint();
+                System.out.println("Filozof " + mojNum + " mysli");
+                switch (variant) {
+                    case 1: // lokaj
+                        if (mojNum == liczba_filozofow - 1) {
+                            widelec[mojNum].acquireUninterruptibly(); // przechwycenie L widelca
+                            widelec[(mojNum + 1) % liczba_filozofow].acquireUninterruptibly(); // przechwycenie P widelca
+                        } else {
+                            widelec[(mojNum + 1) % liczba_filozofow].acquireUninterruptibly(); // przechwycenie P widelca
+                            widelec[mojNum].acquireUninterruptibly(); // przechwycenie L widelca
+                        }
+                        break;
+                    case 2: // niesymetryczne sięganie po widelce
+                        if (mojNum == 0) {
+                            widelec[(mojNum + 1) % liczba_filozofow].acquireUninterruptibly();
+                            widelec[mojNum].acquireUninterruptibly();
+                        } else {
+                            widelec[mojNum].acquireUninterruptibly();
+                            widelec[(mojNum + 1) % liczba_filozofow].acquireUninterruptibly();
+                        }
+                        break;
+                    case 3: // rzut moneta
+//                        if (Math.random() < 0.5) {
+//                            widelec[mojNum].acquireUninterruptibly();
+//                            widelec[(mojNum + 1) % liczba_filozofow].acquireUninterruptibly();
+//                        } else {
+//                            widelec[(mojNum + 1) % liczba_filozofow].acquireUninterruptibly();
+//                            widelec[mojNum].acquireUninterruptibly();
+                        boolean podnioslDwaWidelce = false;
+                        do {
+                            if (Math.random() < 0.5) {
+                                widelec[mojNum].acquireUninterruptibly();
+                                if (!(widelec[(mojNum + 1) % liczba_filozofow].tryAcquire())) {
+                                    widelec[mojNum].release();
+                                } else {
+                                    podnioslDwaWidelce = true;
+                                }
+                            } else {
+                                widelec[(mojNum + 1) % liczba_filozofow].acquireUninterruptibly();
+                                if (!(widelec[mojNum].tryAcquire())) {
+                                    widelec[(mojNum + 1) % liczba_filozofow].release();
+                                } else {
+                                    podnioslDwaWidelce = true;
+                                }
+                            }
+                        } while (!podnioslDwaWidelce);
+                        break;
+                }
+                System.out.println("Filozof " + mojNum + " je");
+                panel.kolory[mojNum] = Color.GREEN;
+                panel.repaint();
+                Thread.sleep(3000);
+                widelec[mojNum].release();
+                widelec[(mojNum + 1) % liczba_filozofow].release();
+                panel.kolory[mojNum] = Color.WHITE;
+                panel.repaint();
+                semaphore.release();
+            } catch (InterruptedException e) {
+            }
+        }
+    }
+
+
+    public static void main(String[] args) {
+        int liczba_filozofow = 15;
+        widelec = new Semaphore[liczba_filozofow];
+        Semaphore semaphore = new Semaphore(liczba_filozofow);
+
+        JFrame frame = new JFrame("Filozofowie");
+        frame.setSize(500, 300);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        FilozofowieVisual panel = new FilozofowieVisual(liczba_filozofow);
+        frame.add(panel);
+        frame.setVisible(true);
+        for (int i = 0; i < liczba_filozofow; i++) {
+            widelec[i] = new Semaphore(1);
+        }
+        for (int i = 0; i < liczba_filozofow; i++) {
+            new Filozofowie(i, panel, 3, 5, semaphore).start();
+        }
+    }
+}
